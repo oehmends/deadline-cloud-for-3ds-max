@@ -39,12 +39,12 @@ class MaxExecutableHandler:
     @cache
     def max_executable(self) -> MaxExecutable:
         """
-        The 3dsMax executable is determined on the fly, based on the 3DSMAX_EXECUTABLE environment variable.
-        If 3DSMAX_EXECUTABLE is not set, it defaults to '3dsmax'.
+        The 3dsMax executable is determined on the fly, based on the ADSK_3DSMAX_EXECUTABLE environment variable.
+        If ADSK_3DSMAX_EXECUTABLE is not set, it defaults to '3dsmax'.
         :returns: Data object containing the details of the 3dsMax executable.
-        :throws ValueError: If the value set in 3DSMAX_EXECUTABLE is not recognized as a valid 3dsMax executable.
+        :throws ValueError: If the value set in ADSK_3DSMAX_EXECUTABLE is not recognized as a valid 3dsMax executable.
         """
-        max_exe_path: str = environ.get("3DSMAX_EXECUTABLE", "3dsmax")
+        max_exe_path: str = environ.get("ADSK_3DSMAX_EXECUTABLE", "3dsmax")
         pattern: str = r"[\\\/]?([^\\\/]+?)(\.exe)?$"
 
         match: Optional[Match[str]] = re.search(pattern, max_exe_path)
