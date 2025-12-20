@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 import pymxs  # noqa
 from pymxs import runtime as rt
@@ -49,6 +49,7 @@ class DefaultMaxHandler:
         self._executable_handler: MaxExecutableHandler = MaxExecutableHandler()
         # Initialize render element manager as private attribute
         self._render_element_manager: Optional["RenderElementManager"] = None
+        self._path_mapper: Optional[Callable[[str], str]] = None
 
     @property
     def render_element_manager(self) -> Optional["RenderElementManager"]:
@@ -69,6 +70,15 @@ class DefaultMaxHandler:
             value: The render element manager instance to set.
         """
         self._render_element_manager = value
+
+    def set_path_mapper(self, path_mapper: Callable[[str], str]) -> None:
+        """
+        Sets the path mapping function from the Max client.
+
+        Args:
+            path_mapper: Callable that maps a path using the adaptor's path mapping rules.
+        """
+        self._path_mapper = path_mapper
 
     def start_render(self, data: dict) -> None:
         """
@@ -324,6 +334,56 @@ class DefaultMaxHandler:
         except Exception:
             self.log_to_console(f"Error: while opening '{file_path}'")
             raise RuntimeError(f"Error: while opening '{file_path}'")
+        self._remap_asset_files()
+
+    def _remap_asset_files(self) -> None:
+        """
+        Remap asset file paths using the adaptor's path mapping rules.
+        """
+        if self._path_mapper is None:
+            return
+
+        try:
+            rt.ATSOps.Refresh()
+            maps = rt.ATSOps.GetFiles(pymxs.byref(None))
+            asset_paths = [str(x) for x in list(maps)[1]]
+        except Exception as e:
+            self.log_to_console(f"Warning: Failed to enumerate asset files: {e}")
+            return
+
+        retarget_method = None
+        for method_name in ("RetargetFile", "SetFile", "ReplaceFile"):
+            method = getattr(rt.ATSOps, method_name, None)
+            if callable(method):
+                retarget_method = method
+                break
+
+        for asset_path in asset_paths:
+            if not asset_path:
+                continue
+            try:
+                mapped_path = self._path_mapper(asset_path)
+            except Exception as e:
+                self.log_to_console(
+                    f"Warning: Failed to map asset path '{asset_path}': {e}"
+                )
+                continue
+
+            if mapped_path == asset_path:
+                continue
+
+            if retarget_method is None:
+                self.log_to_console(
+                    "Warning: Asset paths were mapped but no retarget method is available in ATSOps."
+                )
+                return
+
+            try:
+                retarget_method(asset_path, mapped_path)
+            except Exception as e:
+                self.log_to_console(
+                    f"Warning: Failed to retarget asset '{asset_path}' -> '{mapped_path}': {e}"
+                )
 
     def log_to_console(self, message: str) -> None:
         """

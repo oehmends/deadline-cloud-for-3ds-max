@@ -83,6 +83,8 @@ class MaxClient(ClientInterface):
 
         try:
             render_handler = get_render_handler(renderer["renderer"])
+            if hasattr(render_handler, "set_path_mapper"):
+                render_handler.set_path_mapper(self.map_path)
             self.actions.update(render_handler.action_dict)
         except Exception as e:
             # Log the error and close Max to ensure clean exit
