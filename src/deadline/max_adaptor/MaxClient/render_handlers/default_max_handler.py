@@ -82,6 +82,7 @@ class DefaultMaxHandler:
          - If no camera was set (by init or run data)
          - If no correct output path was given (output_dir, output_name or output_format is missing)
         """
+        region_state: dict[tuple[str, str], object] = {}
         try:
             frame = data.get("frame")
             if frame is None:
@@ -122,6 +123,8 @@ class DefaultMaxHandler:
                 self.log_to_console("Error: MaxClient: start_render called without a camera.")
                 raise RuntimeError("MaxClient: start_render called without a camera.")
 
+            region_state = self._disable_render_region()
+
             # Create output path to pass along with render
             if not output_name:
                 output_name = self.reformat_framenumber_padding(self.output_name, frame)
@@ -146,6 +149,7 @@ class DefaultMaxHandler:
             # Re-raise the exception after cleanup
             raise
         finally:
+            self._restore_render_region(region_state)
             # Restore render elements after rendering if they were configured
             if render_elements_configured:
                 try:
@@ -178,6 +182,64 @@ class DefaultMaxHandler:
         padded_number = zeroes_to_add * "0" + str(number)
         name = name.replace(padding_amount * "#", padded_number)
         return name
+
+    def _disable_render_region(self) -> dict[tuple[str, str], object]:
+        """
+        Disable render region/crop settings to ensure full-frame output.
+        """
+        state: dict[tuple[str, str], object] = {}
+        for attr_name in ("rendUseRegion", "rendRegion", "rendUseCrop", "rendCrop"):
+            try:
+                if hasattr(rt, attr_name):
+                    state[("rt", attr_name)] = getattr(rt, attr_name)
+            except Exception:
+                continue
+
+        for attr_name in ("rendUseRegion", "rendUseCrop"):
+            if ("rt", attr_name) in state:
+                try:
+                    setattr(rt, attr_name, False)
+                except Exception:
+                    continue
+
+        try:
+            renderer = rt.renderers.current
+            for prop_name in rt.getPropNames(renderer):
+                name = str(prop_name)
+                lowered = name.lower()
+                if "region" not in lowered and "crop" not in lowered and "blowup" not in lowered:
+                    continue
+                try:
+                    value = getattr(renderer, name)
+                except Exception:
+                    continue
+                if isinstance(value, bool):
+                    state[("renderer", name)] = value
+                    if value:
+                        try:
+                            setattr(renderer, name, False)
+                        except Exception:
+                            continue
+        except Exception:
+            pass
+
+        return state
+
+    def _restore_render_region(self, state: dict[tuple[str, str], object]) -> None:
+        """
+        Restore render region/crop settings after rendering.
+        """
+        for (target, attr_name), value in state.items():
+            if target == "rt":
+                try:
+                    setattr(rt, attr_name, value)
+                except Exception:
+                    continue
+            elif target == "renderer":
+                try:
+                    setattr(rt.renderers.current, attr_name, value)
+                except Exception:
+                    continue
 
     def check_renderer(self) -> None:
         """
