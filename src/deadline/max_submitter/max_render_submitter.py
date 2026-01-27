@@ -65,8 +65,8 @@ def on_create_job_bundle_callback(
     check_sanity(settings)
 
     _logger.debug("Start on_create_job_bundle_callback")
-    settings.backup_file = rt.execute("GetDir #temp") + "\\" + TEMP_BACKUP_FILENAME
-    _logger.debug(f"backup file: {settings.backup_file}")
+    # Backup handling disabled: scene changes will persist after submission.
+    settings.backup_file = ""
 
     # Load default template
     with open(Path(__file__).parent / "default_max_job_template.yaml") as fh:
@@ -186,13 +186,9 @@ def on_create_job_bundle_callback(
 
     # Only do these actions when we want to submit a scene
     if purpose == JobBundlePurpose.SUBMISSION:
-        # Make a backup of the current state of the scene
-        if os.path.exists(settings.backup_file):
-            os.remove(settings.backup_file)
-        submission_utils.save_max_backup_file(settings.backup_file, True)
-        _logger.debug("Saving backup")
-        submission_utils.backup_saved = True
-        submission_utils.backup_file = settings.backup_file
+        # Backup handling disabled: scene changes will persist after submission.
+        submission_utils.backup_saved = False
+        submission_utils.backup_file = ""
 
         # Make files absolute before submission
         submission_utils.make_paths_absolute()

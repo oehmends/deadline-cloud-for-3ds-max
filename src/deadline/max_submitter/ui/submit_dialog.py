@@ -40,10 +40,7 @@ class SubmitMaxJobToDeadlineDialog(SubmitJobToDeadlineDialog):
             submission_utils.custom_mat = False
             scene_tweaks = True
 
-        if submission_utils.backup_saved:
-            submission_utils.restore_max_copy(submission_utils.backup_file)
-            submission_utils.backup_saved = False
-            scene_tweaks = True
+        # Backup handling disabled: no restore on close.
 
         if scene_tweaks:
             submission_utils.save_scene()
